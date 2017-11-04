@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 import * as ts from 'typescript'
-import * as fs from "fs"
+import * as fs from 'fs'
 
-const is_doctest = (s: string) => s.match(/\/\/[ \t]*=>/) != null
+const is_doctest = (s: string) => s.match(     /\/\/[ \t]*=>/) != null
+const doctest_rhs = (s: string) => s.match(/^\s*\/\/[ \t]*=>([^\n]*)/m)
 
 function replicate<A>(i: number, x: A): A[] {
   const out = [] as A[]
   while (i-- > 0) out.push(x);
   return out
+}
+
+function flatMap<A, B>(xs: A[], f: (a: A) => B[]): B[] {
+  return ([] as B[]).concat(...xs.map(f))
+}
+
+function flatten<A>(xss: A[][]): A[] {
+  return ([] as A[]).concat(...xss)
 }
 
 type Top = {filename: string, defs: Defs}[]
@@ -25,25 +34,18 @@ interface Def {
   kind: string,
 }
 
-function walk(defs: Defs, f: (def: Def, d: number) => void, d0: number = 0): void {
-  defs.forEach(d => (f(d, d0), walk(d.children, f, d0 + 1)))
+function walk<A>(defs: Defs, f: (def: Def, d: number) => A[], d0: number = 0): A[] {
+  return flatten(defs.map(d => f(d, d0).concat(...walk(d.children, f, d0 + 1))))
 }
 
-function flatMap<A, B>(xs: A[], f: (a: A) => B[]): B[] {
-  return ([] as B[]).concat(...xs.map(f))
-}
+/** Generate documentation for all classes in a set of .ts files
 
-function flatten<A>(xss: A[][]): A[] {
-  return ([] as A[]).concat(...xss)
-}
-
-/** Generate documentation for all classes in a set of .ts files */
-function generateDocumentation(fileNames: string[], options: ts.CompilerOptions): Top {
-  const program = ts.createProgram(fileNames, options)
+Adapted from TS wiki about using the compiler API */
+function generateDocumentation(program: ts.Program, filenames: string[]): Top {
   const checker = program.getTypeChecker()
   const printer = ts.createPrinter()
   return program.getSourceFiles()
-    .filter(file => -1 != fileNames.indexOf(file.fileName))
+    .filter(file => -1 != filenames.indexOf(file.fileName))
     .map(file => ({
       filename: file.fileName,
       defs: flatten(file.statements.map(visits))
@@ -128,10 +130,10 @@ function generateDocumentation(fileNames: string[], options: ts.CompilerOptions)
   }
 }
 
-const pwoc = ts.createPrinter({removeComments: true})
-
-function script(s: string): string[] {
-  const f = ts.createSourceFile('test.ts', s, ts.ScriptTarget.ES5, true, ts.ScriptKind.TS)
+function script(program: ts.Program, filename: string, s: string): string[] {
+  const pwoc = ts.createPrinter({removeComments: true})
+  const f = ts.createSourceFile('_doctest_' + filename, s, ts.ScriptTarget.ES5, true, ts.ScriptKind.TS)
+  ts.getPreEmitDiagnostics(program, f)
   const out =
     f.statements.map(
       (now, i) => {
@@ -139,7 +141,7 @@ function script(s: string): string[] {
           const next = f.statements[i+1] // zip with next
           const [a, z] = next ? [next.pos, next.end] : [now.end, f.end]
           const after = f.text.slice(a, z)
-          const m = after.match(/^\s*\/\/[ \t]*=>([^\n]*)/m)
+          const m = doctest_rhs(after)
           if (m && m[1]) {
             const lhs = pwoc.printNode(ts.EmitHint.Expression, now.expression, f)
             const rhs = m[1].trim()
@@ -151,93 +153,127 @@ function script(s: string): string[] {
   return out
 }
 
-const headers = ["import * as test from 'tape'"]
-const filenames = [] as string[]
-let fileout = null
-const argv = process.argv
-for (let i = 2; i < argv.length; i++) {
-  const arg = argv[i]
-  if (arg == '-o') {
-    fileout = argv[++i]
-  } else if (arg == '-i') {
-    headers.push(argv[++i])
-  } else {
-    filenames.push(arg)
-  }
-}
-
-const top = generateDocumentation(filenames, {
-   target: ts.ScriptTarget.ES5, module: ts.ModuleKind.CommonJS
-})
-
-
-if (fileout != null) {
-  const out = headers.slice()
-
-  top.forEach(({filename, defs}) => {
-    walk(defs, d => {
-      let tests = 0
-      d.doc.split(/\n\n+/m).map(s => {
-        if (is_doctest(s)) {
-          out.push(
-            'test(' + JSON.stringify(d.name + ' ' + ++tests) + ', assert => {',
-            ...script(s).map(l => '  ' + l),
-            '  assert.end()',
-            '})',
-            ''
-          )
-        }
-      })
-    })
+function test_script_one(program: ts.Program, filename: string, d: Def): string[] {
+  const out = [] as string[]
+  let tests = 0
+  d.doc.split(/\n\n+/m).map(s => {
+    if (is_doctest(s)) {
+      // todo: typecheck s now
+      out.push(
+        'test(' + JSON.stringify(d.name + ' ' + ++tests) + ', assert => {',
+        ...script(program, filename, s).map(l => '  ' + l),
+        '  assert.end()',
+        '})',
+        ''
+      )
+    }
   })
-
-  fs.writeFileSync(fileout, out.join('\n'));
+  return out
 }
 
-const readme = [] as string[]
+function test_script(program: ts.Program, top: Top) {
+  return ["import * as test from 'tape'"].concat(...top.map(
+    ({filename, defs}) => walk(defs, (d) => test_script_one(program, filename, d)))
+  )
+}
 
-readme.push('## API overview')
 
 function prettyKind(kind: string) {
   return kind.replace('Declaration', '').toLowerCase()
 }
 
-top.forEach(({defs}) => {
-  walk(defs, (def, i) => {
-    if (def.exported || i > 0) {
-      readme.push(
-        replicate(i, '  ').join('') +
-        '* ' +
-        (def.children.length == 0 ? '' : (prettyKind(def.kind) + ' ')) +
-        def.name)
-    }
-  })
-})
+function toc_one(def: Def, i: number): string[] {
+  if (def.exported || i > 0) {
+    return [
+      replicate(i, '  ').join('') +
+      '* ' +
+      (def.children.length == 0 ? '' : (prettyKind(def.kind) + ' ')) +
+      def.name
+    ]
+  } else {
+    return []
+  }
+}
 
-top.forEach(({defs}) =>
-  walk(defs, (def, i) => {
-    if (def.exported || i > 0) {
-      let indent = ''
-      if (def.children.length == 0) {
-        //const method = (def.kind == 'MethodDeclaration') ? 'method ' : ''
-        readme.push('* ' + '**' + def.name + '**: `' + def.type + '`')
-        indent = '  '
-      } else {
-        readme.push('### ' + prettyKind(def.kind) + ' ' + def.name)
+function toc(top: Top): string[] {
+  return flatten(top.map(({defs}) => walk(defs, toc_one)))
+}
+
+function doc_one(def: Def, i: number): string[] {
+  const out = [] as string[]
+  if (def.exported || i > 0) {
+    let indent = ''
+    if (def.children.length == 0) {
+      //const method = (def.kind == 'MethodDeclaration') ? 'method ' : ''
+      out.push('* ' + '**' + def.name + '**: `' + def.type + '`')
+      indent = '  '
+    } else {
+      out.push('### ' + prettyKind(def.kind) + ' ' + def.name)
+    }
+    def.doc.split(/\n\n+/).forEach(s => {
+      out.push('')
+      if (is_doctest(s)) {
+        out.push(indent + '```typescript')
       }
-      def.doc.split(/\n\n+/).forEach(s => {
-        readme.push('')
-        if (is_doctest(s)) {
-          readme.push(indent + '```typescript')
-        }
-        readme.push(indent + s.trim().split('\n').join('\n' + indent))
-        if (is_doctest(s)) {
-          readme.push(indent + '```')
-        }
-      })
+      out.push(indent + s.trim().split('\n').join('\n' + indent))
+      if (is_doctest(s)) {
+        out.push(indent + '```')
+      }
+    })
+  }
+  return out
+}
+
+function doc(top: Top) {
+  return flatten(top.map(({defs}) => walk(defs, doc_one)))
+}
+
+const filenames = [] as string[]
+const argv = process.argv.slice(2)
+const outputs = [] as ((top: Top) => string[])[]
+
+{
+  let program: ts.Program
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]
+    if (arg == '-t' || arg == '--test-script') {
+      outputs.push(top => test_script(program, top))
+    } else if (arg == '-d' || arg == '--doc') {
+      outputs.push(doc)
+    } else if (arg == '--toc' || arg == '--toc') {
+      outputs.push(toc)
+    } else if (arg == '-i' || arg == '--include') {
+      outputs.push(_top => [fs.readFileSync(argv[++i]).toString()])
+    } else if (arg == '-s' || arg == '--string') {
+      outputs.push(_top => [argv[++i]])
+    } else {
+      filenames.push(arg)
     }
-  })
-)
+  }
 
-console.log(readme.join('\n'))
+  if (outputs.length == 0) {
+    console.log(`typescript-doctests <args>
+      Each entry in <args> may be:
+        [-t|--test-script]        // write tape test script on stdout
+        [-d|--doc]                // write markdown api documentation on stdout
+        [--toc]                   // write markdown table of contents on stdout
+        [-i|--include] FILENAME   // write the contents of a file on stdout
+        [-s|--string] STRING      // write a string literally on stdout
+        FILENAME                  // typescript files to look for docstrings in
 
+      Example usages:
+
+        typescript-doctests src/*.ts -s 'import * as App from "../src/App"' -t > test/App.doctest.ts
+
+        typescript-doctests src/*.ts -i Header.md --toc --doc -i Footer.md > README.md
+    `)
+  } else {
+    program = ts.createProgram(filenames, {
+      target: ts.ScriptTarget.ES5,
+      module: ts.ModuleKind.CommonJS
+    })
+    const top = generateDocumentation(program, filenames)
+
+    outputs.forEach(m => m(top).forEach(line => console.log(line)))
+  }
+}
