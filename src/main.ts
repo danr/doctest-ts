@@ -214,7 +214,8 @@ function doc_one(def: Def, i: number): string[] {
       if (is_doctest(s)) {
         out.push(indent + '```typescript')
       }
-      out.push(indent + s.trim().split('\n').join('\n' + indent))
+      const lines = s.split('\n')
+      lines.forEach(line => out.push(indent + line))
       if (is_doctest(s)) {
         out.push(indent + '```')
       }
