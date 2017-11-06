@@ -130,10 +130,9 @@ function generateDocumentation(program: ts.Program, filenames: string[]): Top {
   }
 }
 
-function script(program: ts.Program, filename: string, s: string): string[] {
+function script(filename: string, s: string): string[] {
   const pwoc = ts.createPrinter({removeComments: true})
   const f = ts.createSourceFile('_doctest_' + filename, s, ts.ScriptTarget.ES5, true, ts.ScriptKind.TS)
-  ts.getPreEmitDiagnostics(program, f)
   const out =
     f.statements.map(
       (now, i) => {
@@ -153,7 +152,7 @@ function script(program: ts.Program, filename: string, s: string): string[] {
   return out
 }
 
-function test_script_one(program: ts.Program, filename: string, d: Def): string[] {
+function test_script_one(filename: string, d: Def): string[] {
   const out = [] as string[]
   let tests = 0
   d.doc.split(/\n\n+/m).map(s => {
@@ -161,7 +160,7 @@ function test_script_one(program: ts.Program, filename: string, d: Def): string[
       // todo: typecheck s now
       out.push(
         'test(' + JSON.stringify(d.name + ' ' + ++tests) + ', assert => {',
-        ...script(program, filename, s).map(l => '  ' + l),
+        ...script(filename, s).map(l => '  ' + l),
         '  assert.end()',
         '})',
         ''
@@ -171,9 +170,9 @@ function test_script_one(program: ts.Program, filename: string, d: Def): string[
   return out
 }
 
-function test_script(program: ts.Program, top: Top) {
+function test_script(top: Top) {
   return ["import * as test from 'tape'"].concat(...top.map(
-    ({filename, defs}) => walk(defs, (d) => test_script_one(program, filename, d)))
+    ({filename, defs}) => walk(defs, (d) => test_script_one(filename, d)))
   )
 }
 
@@ -234,10 +233,11 @@ const outputs = [] as ((top: Top) => string[])[]
 
 {
   let program: ts.Program
+  let verbose = false
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg == '-t' || arg == '--test-script') {
-      outputs.push(top => test_script(program, top))
+      outputs.push(test_script)
     } else if (arg == '-d' || arg == '--doc') {
       outputs.push(doc)
     } else if (arg == '--toc' || arg == '--toc') {
