@@ -19,6 +19,15 @@ function flatten<A>(xss: A[][]): A[] {
   return ([] as A[]).concat(...xss)
 }
 
+function silently<A>(m: () => A): A | undefined {
+  try {
+    return m()
+  } catch (e) {
+    // console.error(e)
+    return undefined
+  }
+}
+
 type Top = {filename: string, defs: Defs}[]
 
 type Defs = Def[]
@@ -101,9 +110,11 @@ function generateDocumentation(program: ts.Program, filenames: string[]): Top {
                  || ts.isClassDeclaration(node)
                  || ts.isTypeAliasDeclaration(node),
           type:
-            (symbol.valueDeclaration && !ts.isClassDeclaration(node))
-            ? checker.typeToString(checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration), node, 65535)
-            : undefined,
+            silently(() =>
+              (symbol.valueDeclaration && !ts.isClassDeclaration(node))
+              ? checker.typeToString(checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration), node, 65535)
+              : undefined
+            ),
           children: []
         }
         if ( ts.isInterfaceDeclaration(node) ) {
