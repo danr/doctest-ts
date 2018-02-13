@@ -1,168 +1,154 @@
-#!/usr/bin/env node
-import * as ts from 'typescript'
+import * as babylon from 'babylon'
+import * as babel from 'babel-types'
+import generate from 'babel-generator'
 import * as fs from 'fs'
 
-const is_doctest = (s: string) => s.match(     /\/\/[ \t]*=>/) != null
-const doctest_rhs = (s: string) => s.match(/^\s*\/\/[ \t]*=>([^\n]*)/m)
+import * as util from 'util'
 
-function replicate<A>(i: number, x: A): A[] {
-  const out = [] as A[]
-  while (i-- > 0) out.push(x);
+util.inspect.defaultOptions.depth = 5
+util.inspect.defaultOptions.colors = true
+const pp = (x: any) => (console.dir(x), console.log())
+
+const opts: babylon.BabylonOptions = {
+  plugins: [
+    'estree',
+    'jsx',
+    'flow',
+    'classConstructorCall',
+    'doExpressions',
+    'objectRestSpread',
+    'decorators',
+    'classProperties',
+    'exportExtensions',
+    'asyncGenerators',
+    'functionBind',
+    'functionSent',
+    'dynamicImport',
+  ],
+}
+
+const is_doctest = (s: string) => s.match(/\/\/[ \t]*=>/) != null
+const doctest_rhs = (s: string) => s.match(/^\s*[ \t]*=>((.|\n)*)$/m)
+
+interface Equality {
+  tag: '=='
+  lhs: string
+  rhs: string
+}
+
+interface Statement {
+  tag: 'Statement'
+  stmt: string
+}
+
+type Script = (Statement | Equality)[]
+
+export function test(s: string): Script {
+  const lin = (ast: babel.Node) => generate(ast, {comments: false, compact: true}).code
+  const ast = babylon.parse(s, opts)
+  return ast.program.body.map((stmt): Statement | Equality => {
+    const comment = (stmt.trailingComments || [{value: ''}])[0].value
+    const rhs = doctest_rhs(comment)
+    if (babel.isExpressionStatement(stmt) && rhs) {
+      const rhs = babylon.parseExpression(comment.replace(/^\s*=>/, ''))
+      return {
+        tag: '==',
+        lhs: lin(stmt.expression),
+        rhs: lin(rhs),
+      }
+    } else {
+      return {tag: 'Statement', stmt: lin(stmt)}
+    }
+  })
+}
+
+export function tests(docstring: string): Script[] {
+  const out = [] as Script[]
+  docstring.split(/\n\n+/m).forEach(s => {
+    if (is_doctest(s)) {
+      out.push(test(s))
+    }
+  })
   return out
 }
 
-function flatMap<A, B>(xs: A[], f: (a: A) => B[]): B[] {
-  return ([] as B[]).concat(...xs.map(f))
+export interface Comment {
+  comment: string
+  context: string | null
 }
 
-function flatten<A>(xss: A[][]): A[] {
-  return ([] as A[]).concat(...xss)
-}
-
-function silently<A>(m: () => A): A | undefined {
-  try {
-    return m()
-  } catch (e) {
-    // console.error(e)
-    return undefined
-  }
-}
-
-type Top = {filename: string, defs: Defs}[]
-
-type Defs = Def[]
-
-interface Def {
-  name: string,
-  type?: string,
-  doc: string,
-  exported: boolean,
-  typedef: boolean,
-  flags: string[],
-  children: Defs,
-  kind: string,
-}
-
-function walk<A>(defs: Defs, f: (def: Def, d: number) => A[], d0: number = 0): A[] {
-  return flatten(defs.map(d => f(d, d0).concat(...walk(d.children, f, d0 + 1))))
-}
-
-/** Generate documentation for all classes in a set of .ts files
-
-Adapted from TS wiki about using the compiler API */
-function generateDocumentation(program: ts.Program, filenames: string[]): Top {
-  const checker = program.getTypeChecker()
-  const printer = ts.createPrinter()
-  return program.getSourceFiles()
-    .filter(file => -1 != filenames.indexOf(file.fileName))
-    .map(file => ({
-      filename: file.fileName,
-      defs: flatten(file.statements.map(visits))
-    }))
-
-  function isNodeExported(node: ts.Node): boolean {
-     return (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0
+export function Comments(s: string): Comment[] {
+  const out: Comment[] = []
+  function add_comment(c: babel.Comment, context: string | null) {
+    out.push({comment: c.value, context})
   }
 
-  function visits(node: ts.Node): Defs {
-    if (ts.isVariableStatement(node)) {
-      // top-level const
-      return flatten(node.declarationList.declarations.map(visits))
-    // } else if (ts.isExportAssignment(node)) {
-    //   return { exAss: ts.forEachChild(node, visit) }
-    // } else if (ts.isExportDeclaration(node)) {
-    //   return { exDecl: ts.forEachChild(node, visit) }
-    } if (
-      (  ts.isInterfaceDeclaration(node)
-      || ts.isClassDeclaration(node)
-      || ts.isFunctionDeclaration(node)
-      || ts.isMethodDeclaration(node)
-      || ts.isPropertyDeclaration(node)  // fields in classes
-      || ts.isTypeElement(node)          // fields in interface records
-      || ts.isTypeAliasDeclaration(node) // type A = ...
-      || ts.isVariableDeclaration(node)  // top-level const
-      || ts.isModuleDeclaration(node)
-    ) && node.name) {
-      const symbol = checker.getSymbolAtLocation(node.name);
-      const doc = (((node as any).jsDoc || [])[0] || {}).comment || ''
-      if (symbol) {
-        const out: Def = {
-          name: symbol.name,
-          doc,
-          exported: isNodeExported(node),
-          kind: ts.SyntaxKind[node.kind],
-          flags: [
-            ts.ModifierFlags.None,
-            ts.ModifierFlags.Export,
-            ts.ModifierFlags.Ambient,
-            ts.ModifierFlags.Public,
-            ts.ModifierFlags.Private,
-            ts.ModifierFlags.Protected,
-            ts.ModifierFlags.Static,
-            ts.ModifierFlags.Readonly,
-            ts.ModifierFlags.Abstract,
-            ts.ModifierFlags.Async,
-            ts.ModifierFlags.Default,
-            ts.ModifierFlags.Const
-          ].map(flag => ts.ModifierFlags[symbol.flags & flag])
-           .filter(flag => flag != 'None'),
-          typedef: ts.isInterfaceDeclaration(node)
-                 || ts.isClassDeclaration(node)
-                 || ts.isTypeAliasDeclaration(node),
-          type:
-            silently(() =>
-              (symbol.valueDeclaration && !ts.isClassDeclaration(node))
-              ? checker.typeToString(checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration), node, 65535)
-              : undefined
-            ),
-          children: []
+  const ast = babylon.parse(s, opts)
+
+  traverse(ast, node => {
+    let context: null | string = null
+    function has_key(x: any): x is {key: babel.Identifier} {
+      return isObject(x) && 'key' in x && babel.isIdentifier((x as any).key)
+    }
+    function has_id(x: any): x is {id: babel.Identifier} {
+      return isObject(x) && 'id' in x && babel.isIdentifier((x as any).id)
+    }
+    if (babel.isVariableDeclaration(node)) {
+      const ds = node.declarations
+      if (ds.length == 1) {
+        const d = ds[0]
+        if (has_id(d)) {
+          context = d.id.name
         }
-        if ( ts.isInterfaceDeclaration(node) ) {
-          out.children = flatten(node.members.map(visits))
-        }
-        if ( ts.isClassDeclaration(node) ) {
-          out.children = flatten(node.members.map(visits))
-        }
-        if ( ts.isModuleDeclaration(node) && node.body ) {
-          const b = node.body
-          if (b.kind == ts.SyntaxKind.ModuleBlock) {
-            out.children = flatten(b.statements.map(visits))
-          }
-        }
-        return [out]
       }
-      return []
-    } else if (ts.isModuleBlock(node)) {
-      return flatten(node.getChildren().map(visits))
-    } else {
-      console.error("Ignoring " + ts.SyntaxKind[node.kind])
-      return []
+    } else if (has_id(node)) {
+      context = node.id.name
+    } else if (has_key(node)) {
+      context = node.key.name
+    }
+    if (isObject(node)) {
+      function add_comments(s: string) {
+        if (s in node && Array.isArray(node[s])) {
+          ;(node[s] as any[]).forEach(c => {
+            if ('type' in c) {
+              if (c.type == 'CommentBlock' || c.type == 'CommentLine') {
+                add_comment(c, context)
+                if (context == null) {
+                  // pp({c, node})
+                }
+              }
+            }
+          })
+        }
+      }
+      if (isObject(node)) {
+        add_comments('leadingComments')
+        add_comments('innerComments')
+        // add_comments('trailingComments')
+      }
+    }
+  })
+
+  return out
+}
+
+function isObject(x: any): x is object {
+  return x !== null && typeof x === 'object' && !Array.isArray(x)
+}
+
+function traverse(x: any, f: (x: any) => void): void {
+  f(x)
+  if (Array.isArray(x)) {
+    x.map(y => traverse(y, f))
+  }
+  if (isObject(x)) {
+    for (const k in x) {
+      traverse((x as any)[k], f)
     }
   }
 }
 
-function script(filename: string, s: string): string[] {
-  const pwoc = ts.createPrinter({removeComments: true})
-  const f = ts.createSourceFile('_doctest_' + filename, s, ts.ScriptTarget.ES5, true, ts.ScriptKind.TS)
-  const out =
-    f.statements.map(
-      (now, i) => {
-        if (ts.isExpressionStatement(now)) {
-          const next = f.statements[i+1] // zip with next
-          const [a, z] = next ? [next.pos, next.end] : [now.end, f.end]
-          const after = f.text.slice(a, z)
-          const m = doctest_rhs(after)
-          if (m && m[1]) {
-            const lhs = pwoc.printNode(ts.EmitHint.Expression, now.expression, f)
-            const rhs = m[1].trim()
-            return 'assert.deepEqual(' + lhs + ', ' + rhs + ', ' + JSON.stringify(rhs) + ')'
-          }
-        }
-        return pwoc.printNode(ts.EmitHint.Unspecified, now, f)
-      })
-  return out
-}
-
+/*
 function test_script_one(filename: string, d: Def): string[] {
   const out = [] as string[]
   let tests = 0
@@ -170,9 +156,8 @@ function test_script_one(filename: string, d: Def): string[] {
     if (is_doctest(s)) {
       // todo: typecheck s now
       out.push(
-        'test(' + JSON.stringify(d.name + ' ' + ++tests) + ', assert => {',
+        'test(' + JSON.stringify(d.name + ' ' + ++tests) + ', t => {',
         ...script(filename, s).map(l => '  ' + l),
-        '  assert.end()',
         '})',
         ''
       )
@@ -182,61 +167,9 @@ function test_script_one(filename: string, d: Def): string[] {
 }
 
 function test_script(top: Top) {
-  return ["import * as test from 'tape'"].concat(...top.map(
+  return ["import {test} from 'ava'"].concat(...top.map(
     ({filename, defs}) => walk(defs, (d) => test_script_one(filename, d)))
   )
-}
-
-
-function prettyKind(kind: string) {
-  return kind.replace('Declaration', '').toLowerCase()
-}
-
-function toc_one(def: Def, i: number): string[] {
-  if (def.exported || i > 0) {
-    return [
-      replicate(i, '  ').join('') +
-      '* ' +
-      (def.children.length == 0 ? '' : (prettyKind(def.kind) + ' ')) +
-      def.name
-    ]
-  } else {
-    return []
-  }
-}
-
-function toc(top: Top): string[] {
-  return flatten(top.map(({defs}) => walk(defs, toc_one)))
-}
-
-function doc_one(def: Def, i: number): string[] {
-  const out = [] as string[]
-  if (def.exported || i > 0) {
-    let indent = ''
-    if (def.children.length == 0) {
-      //const method = (def.kind == 'MethodDeclaration') ? 'method ' : ''
-      out.push('* ' + '**' + def.name + '**: `' + def.type + '`')
-      indent = '  '
-    } else {
-      out.push('### ' + prettyKind(def.kind) + ' ' + def.name)
-    }
-    def.doc.split(/\n\n+/).forEach(s => {
-      out.push('')
-      if (is_doctest(s)) {
-        out.push(indent + '```typescript')
-      }
-      const lines = s.split('\n')
-      lines.forEach(line => out.push(indent + line))
-      if (is_doctest(s)) {
-        out.push(indent + '```')
-      }
-    })
-  }
-  return out
-}
-
-function doc(top: Top) {
-  return flatten(top.map(({defs}) => walk(defs, doc_one)))
 }
 
 const filenames = [] as string[]
@@ -279,6 +212,7 @@ const outputs = [] as ((top: Top) => string[])[]
 
         typescript-doctests src/*.ts -i Header.md --toc --doc -i Footer.md > README.md
     `)
+    process.exit(1)
   } else {
     program = ts.createProgram(filenames, {
       target: ts.ScriptTarget.ES5,
@@ -289,3 +223,4 @@ const outputs = [] as ((top: Top) => string[])[]
     outputs.forEach(m => m(top).forEach(line => console.log(line)))
   }
 }
+*/

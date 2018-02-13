@@ -7,8 +7,11 @@
     "typescript-doctest": "src/main.js"
   },
   "scripts": {
-    "preinstall": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "test:watch": "tsc --watch & ava --watch dist/test",
+    "test": "tsc && ava dist/test",
+    "coverage": "tsc && nyc ava dist/test",
+    "prettier": "prettier --list-different --write src/*ts* test/*ts*"
   },
   "repository": {
     "type": "git",
@@ -26,9 +29,25 @@
   },
   "homepage": "https://github.com/danr/typescript-doctest#readme",
   "dependencies": {
-    "typescript": "^2.6.1"
+    "babel-generator": "^6.26.1",
+    "babel-types": "^6.26.0",
+    "babylon": "^6.18.0"
   },
   "devDependencies": {
-    "@types/node": "^8.0.47"
+    "@types/babel-generator": "^6.25.1",
+    "@types/babel-types": "^7.0.0",
+    "@types/babylon": "^6.16.2",
+    "@types/node": "^9.4.5",
+    "ava": "^0.25.0",
+    "prettier": "^1.10.2",
+    "typescript": "^2.7.1"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "jsxBracketSameLine": true,
+    "bracketSpacing": false
   }
 }
