@@ -1,226 +1,213 @@
-import * as babylon from 'babylon'
-import * as babel from 'babel-types'
-import generate from 'babel-generator'
 import * as fs from 'fs'
+import * as chokidar from 'chokidar'
+import * as minimist from 'minimist'
+import * as ts from 'typescript'
 
-import * as util from 'util'
+////////////////////////////////////////////////////////////
+// Types
 
-util.inspect.defaultOptions.depth = 5
-util.inspect.defaultOptions.colors = true
-const pp = (x: any) => (console.dir(x), console.log())
-
-const opts: babylon.BabylonOptions = {
-  plugins: [
-    'estree',
-    'jsx',
-    'flow',
-    'classConstructorCall',
-    'doExpressions',
-    'objectRestSpread',
-    'decorators',
-    'classProperties',
-    'exportExtensions',
-    'asyncGenerators',
-    'functionBind',
-    'functionSent',
-    'dynamicImport',
-  ],
-}
-
-const is_doctest = (s: string) => s.match(/\/\/[ \t]*=>/) != null
-const doctest_rhs = (s: string) => s.match(/^\s*[ \t]*=>((.|\n)*)$/m)
-
-interface Equality {
+export interface Equality {
   tag: '=='
   lhs: string
   rhs: string
 }
 
-interface Statement {
+export interface Statement {
   tag: 'Statement'
   stmt: string
 }
 
-type Script = (Statement | Equality)[]
+export type Script = (Statement | Equality)[]
 
-export function test(s: string): Script {
-  const lin = (ast: babel.Node) => generate(ast, {comments: false, compact: true}).code
-  const ast = babylon.parse(s, opts)
-  return ast.program.body.map((stmt): Statement | Equality => {
-    const comment = (stmt.trailingComments || [{value: ''}])[0].value
-    const rhs = doctest_rhs(comment)
-    if (babel.isExpressionStatement(stmt) && rhs) {
-      const rhs = babylon.parseExpression(comment.replace(/^\s*=>/, ''))
-      return {
-        tag: '==',
-        lhs: lin(stmt.expression),
-        rhs: lin(rhs),
-      }
-    } else {
-      return {tag: 'Statement', stmt: lin(stmt)}
-    }
-  })
-}
-
-export function tests(docstring: string): Script[] {
-  const out = [] as Script[]
-  docstring.split(/\n\n+/m).forEach(s => {
-    if (is_doctest(s)) {
-      out.push(test(s))
-    }
-  })
-  return out
-}
+export type Context = string | null
 
 export interface Comment {
   comment: string
-  context: string | null
+  context: Context
 }
+
+////////////////////////////////////////////////////////////
+// Extracting docstrings from program
 
 export function Comments(s: string): Comment[] {
   const out: Comment[] = []
-  function add_comment(c: babel.Comment, context: string | null) {
-    out.push({comment: c.value, context})
+  function add_comment(c: string, context: string | null) {
   }
 
-  const ast = babylon.parse(s, opts)
+  function traverse(node: ts.Node) {
+    const jsdocs = (node as any).jsDoc || []
+    if (jsdocs.length > 0) {
+      let context: string | null = null
+      try {
+        context = (node as any).name.escapedText || null
+      } catch (e) {
+      try {
+        const decls = (node as any).declarationList.declarations
+        if (decls.length == 1) {
+          context = decls[0].name.escapedText || null
+        }
+      } catch (e) {
+        // console.dir(node)
+        context =ts.isConstructorDeclaration(node) ? 'constructor' : null
+      }
+      }
+      jsdocs.forEach((doc: ts.JSDoc) => {
+        out.push({comment: doc.comment || '', context})
+      })
+    }
+    ts.forEachChild(node, traverse)
+  }
 
-  traverse(ast, node => {
-    let context: null | string = null
-    function has_key(x: any): x is {key: babel.Identifier} {
-      return isObject(x) && 'key' in x && babel.isIdentifier((x as any).key)
-    }
-    function has_id(x: any): x is {id: babel.Identifier} {
-      return isObject(x) && 'id' in x && babel.isIdentifier((x as any).id)
-    }
-    if (babel.isVariableDeclaration(node)) {
-      const ds = node.declarations
-      if (ds.length == 1) {
-        const d = ds[0]
-        if (has_id(d)) {
-          context = d.id.name
-        }
-      }
-    } else if (has_id(node)) {
-      context = node.id.name
-    } else if (has_key(node)) {
-      context = node.key.name
-    }
-    if (isObject(node)) {
-      function add_comments(s: string) {
-        if (s in node && Array.isArray(node[s])) {
-          ;(node[s] as any[]).forEach(c => {
-            if ('type' in c) {
-              if (c.type == 'CommentBlock' || c.type == 'CommentLine') {
-                add_comment(c, context)
-                if (context == null) {
-                  // pp({c, node})
-                }
-              }
-            }
-          })
-        }
-      }
-      if (isObject(node)) {
-        add_comments('leadingComments')
-        add_comments('innerComments')
-        // add_comments('trailingComments')
-      }
-    }
-  })
+  const ast = ts.createSourceFile('_.ts', s, ts.ScriptTarget.Latest)
+  traverse(ast)
 
   return out
 }
 
-function isObject(x: any): x is object {
-  return x !== null && typeof x === 'object' && !Array.isArray(x)
-}
+////////////////////////////////////////////////////////////
+// Extracting test scripts from docstrings
 
-function traverse(x: any, f: (x: any) => void): void {
-  f(x)
-  if (Array.isArray(x)) {
-    x.map(y => traverse(y, f))
-  }
-  if (isObject(x)) {
-    for (const k in x) {
-      traverse((x as any)[k], f)
-    }
-  }
-}
+/**
 
-/*
-function test_script_one(filename: string, d: Def): string[] {
-  const out = [] as string[]
-  let tests = 0
-  d.doc.split(/\n\n+/m).map(s => {
-    if (is_doctest(s)) {
-      // todo: typecheck s now
-      out.push(
-        'test(' + JSON.stringify(d.name + ' ' + ++tests) + ', t => {',
-        ...script(filename, s).map(l => '  ' + l),
-        '})',
-        ''
-      )
-    }
-  })
-  return out
-}
+  is_doctest('// => true') // => true
+  is_doctest('// true') // => false
 
-function test_script(top: Top) {
-  return ["import {test} from 'ava'"].concat(...top.map(
-    ({filename, defs}) => walk(defs, (d) => test_script_one(filename, d)))
-  )
-}
-
-const filenames = [] as string[]
-const argv = process.argv.slice(2)
-const outputs = [] as ((top: Top) => string[])[]
-
-{
-  let program: ts.Program
-  let verbose = false
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]
-    if (arg == '-t' || arg == '--test-script') {
-      outputs.push(test_script)
-    } else if (arg == '-d' || arg == '--doc') {
-      outputs.push(doc)
-    } else if (arg == '--toc' || arg == '--toc') {
-      outputs.push(toc)
-    } else if (arg == '-i' || arg == '--include') {
-      outputs.push(_top => [fs.readFileSync(argv[++i]).toString()])
-    } else if (arg == '-s' || arg == '--string') {
-      outputs.push(_top => [argv[++i]])
-    } else {
-      filenames.push(arg)
-    }
-  }
-
-  if (outputs.length == 0) {
-    console.log(`typescript-doctests <args>
-      Each entry in <args> may be:
-        [-t|--test-script]        // write tape test script on stdout
-        [-d|--doc]                // write markdown api documentation on stdout
-        [--toc]                   // write markdown table of contents on stdout
-        [-i|--include] FILENAME   // write the contents of a file on stdout
-        [-s|--string] STRING      // write a string literally on stdout
-        FILENAME                  // typescript files to look for docstrings in
-
-      Example usages:
-
-        typescript-doctests src/*.ts -s 'import * as App from "../src/App"' -t > test/App.doctest.ts
-
-        typescript-doctests src/*.ts -i Header.md --toc --doc -i Footer.md > README.md
-    `)
-    process.exit(1)
-  } else {
-    program = ts.createProgram(filenames, {
-      target: ts.ScriptTarget.ES5,
-      module: ts.ModuleKind.CommonJS
-    })
-    const top = generateDocumentation(program, filenames)
-
-    outputs.forEach(m => m(top).forEach(line => console.log(line)))
-  }
-}
 */
+const is_doctest = (s: string) => s.match(     /\/\/[ \t]*=>/) != null
+
+
+
+/**
+
+  const m = doctest_rhs('// => true') || []
+  m[1] // => ' true'
+
+*/
+const doctest_rhs = (s: string) => s.match(/^\s*\/\/[ \t]*=>([^\n]*)/m)
+
+/**
+
+  extractScript('s') // => [{tag: 'Statement', stmt: 's;'}]
+
+  extractScript('e // => 1') // => [{tag: '==', lhs: 'e', rhs: '1'}]
+
+  extractScript('s; e // => 1') // => [{tag: 'Statement', stmt: 's;'}, {tag: '==', lhs: 'e', rhs: '1'}]
+
+*/
+export function extractScript(s: string): Script {
+  const pwoc = ts.createPrinter({removeComments: true})
+  const ast = ts.createSourceFile('_.ts', s, ts.ScriptTarget.Latest)
+  return ast.statements.map(
+      (stmt, i): Statement | Equality => {
+        if (ts.isExpressionStatement(stmt)) {
+          const next = ast.statements[i+1] // zip with next
+          const [a, z] = next ? [next.pos, next.end] : [stmt.end, ast.end]
+          const after = ast.text.slice(a, z)
+          const m = doctest_rhs(after)
+          if (m && m[1]) {
+            const lhs = pwoc.printNode(ts.EmitHint.Expression, stmt.expression, ast)
+            const rhs = m[1].trim()
+            return { tag: '==', lhs, rhs }
+          }
+        }
+
+      return {tag: 'Statement', stmt: pwoc.printNode(ts.EmitHint.Unspecified, stmt, ast)}
+      })
+
+}
+
+export function extractScripts(docstring: string): Script[] {
+  const out = [] as Script[]
+  docstring.split(/\n\n+/m).forEach(s => {
+    if (is_doctest(s)) {
+      out.push(extractScript(s))
+    }
+  })
+  return out
+}
+
+////////////////////////////////////////////////////////////
+// Showing test scripts
+export interface ShowScript {
+  showImports: string
+  showScript(script: Script, c: Context): string
+}
+
+/** show("hello") // => '"hello"' */
+export function show(s: any) {
+  return JSON.stringify(s)
+}
+
+export function showContext(c: Context) {
+  return show(c || 'doctest')
+}
+
+const ava: ShowScript = {
+  showImports: 'import {test as __test} from "ava"',
+  showScript(script, c) {
+    const t = `__t`
+    const body = script.map(s => {
+      if (s.tag == 'Statement') {
+        return s.stmt
+      } else {
+        return `${t}.deepEqual(${s.lhs}, ${s.rhs}, ${show(s.rhs)})`
+      }
+    }).join('\n')
+    return `__test(${showContext(c)}, ${t} => {${body}})`
+  }
+}
+
+const tape: ShowScript = {
+  showImports: 'import * as __test from "tape"',
+  showScript: ava.showScript
+}
+
+const showScriptInstances = {ava, tape}
+
+import * as path from 'path'
+
+function instrument(d: ShowScript, file: string): void {
+  const {base, ext, ...u} = path.parse(file)
+  if (base.includes('doctest')) {
+    return
+  }
+  const buffer = fs.readFileSync(file, {encoding: 'utf8'})
+  const tests = Doctests(d, buffer)
+  const outfile = path.format({...u, ext: '.doctest' + ext})
+  console.log('Writing', outfile)
+  fs.writeFileSync(outfile, d.showImports + '\n' + buffer + '\n' + tests)
+}
+
+function Doctests(d: ShowScript, buffer: string): string {
+  let s = ''
+  for (const c of Comments(buffer)) {
+    for (const script of extractScripts(c.comment)) {
+      s += '\n' + d.showScript(script, c.context)
+    }
+  }
+  return s
+}
+
+function main() {
+  const opts = minimist(process.argv.slice(2), {boolean: ['tape', 'ava', 'watch']})
+  const d = showScriptInstances[opts.tape == true ? 'tape' : 'ava']
+  const files = opts._
+  if (files.length == 0) {
+    console.error(`No files specified!
+
+      Usage:
+
+        [-w|--watch] [--ava|--tape] files globs...
+
+    Your options were:`, opts)
+    process.exit(1)
+  }
+  files.forEach(file => instrument(d, file))
+  if (opts.w == true || opts.watch == true) {
+    const watcher = chokidar.watch(files)
+    watcher.on('change', file => instrument(d, file))
+  }
+}
+
+~process.argv[1].indexOf('test-worker.js') || main()
+
