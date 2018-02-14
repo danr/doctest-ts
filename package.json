@@ -8,10 +8,9 @@
     "typescript-doctest": "dist/src/main.js"
   },
   "scripts": {
-    "build": "tsc src/main.ts",
-    "test": "ts-node test/*ts src/*doctest.ts | tap-diff",
-    "avatest": "tsc && ava dist/test/*js dist/src/*doctest.js",
-    "avatest:watch": "tsc --watch & ava --watch dist/test dist/src/*doctest*",
+    "build": "tsc",
+    "test": "tsc && ts-node src/main.ts --ava src/*ts && ava dist/test/*js dist/src/*doctest.js",
+    "test:watch": "tsc --watch & ts-node src/main.ts --watch --ava src/*ts & tsc --watch & ava --watch dist/test dist/src/*doctest*",
     "coverage": "tsc && nyc ava dist/test",
     "prettier": "prettier --list-different --write src/*ts* test/*ts*"
   },
@@ -32,6 +31,7 @@
   "homepage": "https://github.com/danr/typescript-doctest#readme",
   "dependencies": {
     "chokidar": "^2.0.1",
+    "global": "^4.3.2",
     "minimist": "^1.2.0",
     "typescript": "^2.7.1"
   },

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import * as fs from 'fs'
 import * as chokidar from 'chokidar'
 import * as minimist from 'minimist'
@@ -175,7 +176,7 @@ function instrument(d: ShowScript, file: string): void {
   const tests = Doctests(d, buffer)
   const outfile = path.format({...u, ext: '.doctest' + ext})
   console.log('Writing', outfile)
-  fs.writeFileSync(outfile, d.showImports + '\n' + buffer + '\n' + tests)
+  fs.writeFileSync(outfile, buffer + '\n' + d.showImports + '\n' + tests)
 }
 
 function Doctests(d: ShowScript, buffer: string): string {
