@@ -143,10 +143,8 @@ export function showContext(c: Context) {
   return show(c || 'doctest')
 }
 
-const ava: ShowScript = {
-  showImports: 'import {test as __test} from "ava"',
-  showScript(script, c) {
-    const t = `__t`
+function showScript(script: Script, c: Context, before_end=(t: string) => '') {
+    const t = `t`
     const body = script.map(s => {
       if (s.tag == 'Statement') {
         return s.stmt
@@ -154,20 +152,24 @@ const ava: ShowScript = {
         return `${t}.deepEqual(${s.lhs}, ${s.rhs}, ${show(s.rhs)})`
       }
     }).join('\n')
-    return `__test(${showContext(c)}, ${t} => {${body}})`
+    return `__test(${showContext(c)}, ${t} => {${body}${before_end(t)}})`
   }
+
+const ava: ShowScript = {
+  showImports: 'import {test as __test} from "ava"',
+  showScript: showScript
 }
 
 const tape: ShowScript = {
   showImports: 'import * as __test from "tape"',
-  showScript: ava.showScript
+  showScript: (s, c) => showScript(s, c, t => `\n;${t}.end()`)
 }
 
 const showScriptInstances = {ava, tape}
 
 import * as path from 'path'
 
-function instrument(d: ShowScript, file: string): void {
+function instrument(d: ShowScript, file: string, mode?: 'watch'): void {
   const {base, ext, ...u} = path.parse(file)
   if (base.includes('doctest')) {
     return
@@ -175,18 +177,25 @@ function instrument(d: ShowScript, file: string): void {
   const buffer = fs.readFileSync(file, {encoding: 'utf8'})
   const tests = Doctests(d, buffer)
   const outfile = path.format({...u, ext: '.doctest' + ext})
-  console.log('Writing', outfile)
-  fs.writeFileSync(outfile, buffer + '\n' + d.showImports + '\n' + tests)
+  if (tests.length == 0) {
+    console.error('No doctests found in', file)
+  } else {
+    console.error('Writing', outfile)
+    if (mode == 'watch') {
+      console.log(outfile)
+    }
+    fs.writeFileSync(outfile, buffer + '\n' + d.showImports + '\n' + tests)
+  }
 }
 
-function Doctests(d: ShowScript, buffer: string): string {
-  let s = ''
+function Doctests(d: ShowScript, buffer: string): string[] {
+  const out: string[] = []
   for (const c of Comments(buffer)) {
     for (const script of extractScripts(c.comment)) {
-      s += '\n' + d.showScript(script, c.context)
+      out.push(d.showScript(script, c.context))
     }
   }
-  return s
+  return out
 }
 
 function main() {
@@ -205,8 +214,8 @@ function main() {
   }
   files.forEach(file => instrument(d, file))
   if (opts.w == true || opts.watch == true) {
-    const watcher = chokidar.watch(files)
-    watcher.on('change', file => instrument(d, file))
+    const watcher = chokidar.watch(files, {ignored: '*.doctest.*'})
+    watcher.on('change', file => instrument(d, file, 'watch'))
   }
 }
 
