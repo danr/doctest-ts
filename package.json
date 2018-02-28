@@ -9,10 +9,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "tsc && ts-node src/main.ts --ava src/*ts && ava dist/test/*js dist/src/*doctest.js",
-    "test:watch": "tsc --watch & ts-node src/main.ts --watch --ava src/*ts & tsc --watch & ava --watch dist/test dist/src/*doctest*",
-    "coverage": "tsc && nyc ava dist/test",
-    "prettier": "prettier --list-different --write src/*ts* test/*ts*"
+    "test": "ts-node src/main.ts --tape src/*ts && ts-node node_modules/.bin/tape test/*.ts src/*doctest*.ts | tap-diff",
+    "doctest:watch": "ts-node src/main.ts --tape --watch src/*.ts | while read file; do echo tape $file; ts-node $file | tap-diff; done",
+    "prettier": "rm -v -f {src,test}/*doctest.ts && prettier --list-different --write src/*ts* test/*ts*"
   },
   "repository": {
     "type": "git",
@@ -36,15 +35,15 @@
     "typescript": "^2.7.1"
   },
   "devDependencies": {
-    "@types/chokidar": "^1.7.4",
+    "@types/chokidar": "^1.7.5",
     "@types/minimist": "^1.2.0",
-    "@types/node": "^9.4.5",
+    "@types/node": "^9.4.6",
     "@types/tape": "^4.2.31",
-    "ava": "^0.25.0",
     "faucet": "^0.0.1",
-    "prettier": "^1.10.2",
+    "prettier": "^1.11.0",
     "tap-diff": "^0.1.1",
-    "tape": "^4.8.0"
+    "tape": "^4.9.0",
+    "ts-node": "^5.0.0"
   },
   "prettier": {
     "printWidth": 100,

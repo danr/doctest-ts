@@ -32,8 +32,7 @@ export interface Comment {
 
 export function Comments(s: string): Comment[] {
   const out: Comment[] = []
-  function add_comment(c: string, context: string | null) {
-  }
+  function add_comment(c: string, context: string | null) {}
 
   function traverse(node: ts.Node) {
     const jsdocs = (node as any).jsDoc || []
@@ -42,15 +41,15 @@ export function Comments(s: string): Comment[] {
       try {
         context = (node as any).name.escapedText || null
       } catch (e) {
-      try {
-        const decls = (node as any).declarationList.declarations
-        if (decls.length == 1) {
-          context = decls[0].name.escapedText || null
+        try {
+          const decls = (node as any).declarationList.declarations
+          if (decls.length == 1) {
+            context = decls[0].name.escapedText || null
+          }
+        } catch (e) {
+          // console.dir(node)
+          context = ts.isConstructorDeclaration(node) ? 'constructor' : null
         }
-      } catch (e) {
-        // console.dir(node)
-        context =ts.isConstructorDeclaration(node) ? 'constructor' : null
-      }
       }
       jsdocs.forEach((doc: ts.JSDoc) => {
         out.push({comment: doc.comment || '', context})
@@ -74,9 +73,7 @@ export function Comments(s: string): Comment[] {
   is_doctest('// true') // => false
 
 */
-const is_doctest = (s: string) => s.match(     /\/\/[ \t]*=>/) != null
-
-
+const is_doctest = (s: string) => s.match(/\/\/[ \t]*=>/) != null
 
 /**
 
@@ -98,23 +95,21 @@ const doctest_rhs = (s: string) => s.match(/^\s*\/\/[ \t]*=>([^\n]*)/m)
 export function extractScript(s: string): Script {
   const pwoc = ts.createPrinter({removeComments: true})
   const ast = ts.createSourceFile('_.ts', s, ts.ScriptTarget.Latest)
-  return ast.statements.map(
-      (stmt, i): Statement | Equality => {
-        if (ts.isExpressionStatement(stmt)) {
-          const next = ast.statements[i+1] // zip with next
-          const [a, z] = next ? [next.pos, next.end] : [stmt.end, ast.end]
-          const after = ast.text.slice(a, z)
-          const m = doctest_rhs(after)
-          if (m && m[1]) {
-            const lhs = pwoc.printNode(ts.EmitHint.Expression, stmt.expression, ast)
-            const rhs = m[1].trim()
-            return { tag: '==', lhs, rhs }
-          }
-        }
+  return ast.statements.map((stmt, i): Statement | Equality => {
+    if (ts.isExpressionStatement(stmt)) {
+      const next = ast.statements[i + 1] // zip with next
+      const [a, z] = next ? [next.pos, next.end] : [stmt.end, ast.end]
+      const after = ast.text.slice(a, z)
+      const m = doctest_rhs(after)
+      if (m && m[1]) {
+        const lhs = pwoc.printNode(ts.EmitHint.Expression, stmt.expression, ast)
+        const rhs = m[1].trim()
+        return {tag: '==', lhs, rhs}
+      }
+    }
 
-      return {tag: 'Statement', stmt: pwoc.printNode(ts.EmitHint.Unspecified, stmt, ast)}
-      })
-
+    return {tag: 'Statement', stmt: pwoc.printNode(ts.EmitHint.Unspecified, stmt, ast)}
+  })
 }
 
 export function extractScripts(docstring: string): Script[] {
@@ -143,26 +138,28 @@ export function showContext(c: Context) {
   return show(c || 'doctest')
 }
 
-function showScript(script: Script, c: Context, before_end=(t: string) => '') {
-    const t = `t`
-    const body = script.map(s => {
+function showScript(script: Script, c: Context, before_end = (t: string) => '') {
+  const t = `t`
+  const body = script
+    .map(s => {
       if (s.tag == 'Statement') {
         return s.stmt
       } else {
         return `${t}.deepEqual(${s.lhs}, ${s.rhs}, ${show(s.rhs)})`
       }
-    }).join('\n')
-    return `__test(${showContext(c)}, ${t} => {${body}${before_end(t)}})`
-  }
+    })
+    .join('\n')
+  return `__test(${showContext(c)}, ${t} => {${body}${before_end(t)}})`
+}
 
 const ava: ShowScript = {
   showImports: 'import {test as __test} from "ava"',
-  showScript: showScript
+  showScript: showScript,
 }
 
 const tape: ShowScript = {
   showImports: 'import * as __test from "tape"',
-  showScript: (s, c) => showScript(s, c, t => `\n;${t}.end()`)
+  showScript: (s, c) => showScript(s, c, t => `\n;${t}.end()`),
 }
 
 const showScriptInstances = {ava, tape}
@@ -203,13 +200,19 @@ function main() {
   const d = showScriptInstances[opts.tape == true ? 'tape' : 'ava']
   const files = opts._
   if (files.length == 0) {
-    console.error(`No files specified!
+    console.error(
+      `No files specified!
 
       Usage:
 
         [-w|--watch] [--ava|--tape] files globs...
 
-    Your options were:`, opts)
+    Your options were:`,
+      opts,
+      `
+    From:`,
+      process.argv
+    )
     process.exit(1)
   }
   files.forEach(file => instrument(d, file))
@@ -219,5 +222,5 @@ function main() {
   }
 }
 
-~process.argv[1].indexOf('test-worker.js') || main()
-
+// if we are checking the doctests of this very file we don't need to run main
+~process.argv[1].indexOf('doctest') || main()

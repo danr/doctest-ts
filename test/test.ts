@@ -1,5 +1,5 @@
 import * as main from '../src/main'
-import test from 'ava'
+import * as test from 'tape'
 
 test('tests', t => {
   t.plan(1)
@@ -34,8 +34,6 @@ test('tests', t => {
     ]
   )
 })
-
-
 
 const c = (comment: string, context: string | null) => ({comment, context})
 
@@ -108,12 +106,7 @@ test('class', t => {
       p: Array<number>
     }
   `)
-  t.deepEqual(cs, [
-    c('C ', 'C'),
-    c('constructor ', 'constructor'),
-    c('m ', 'm'),
-    c('p ', 'p'),
-  ])
+  t.deepEqual(cs, [c('C ', 'C'), c('constructor ', 'constructor'), c('m ', 'm'), c('p ', 'p')])
 })
 
 test('interface', t => {
