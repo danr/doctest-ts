@@ -215,7 +215,7 @@ function main() {
   files.forEach(file => instrument(d, file))
   if (opts.w == true || opts.watch == true) {
     const watcher = chokidar.watch(files, {ignored: '*.doctest.*'})
-    watcher.on('change', file => instrument(d, file, 'watch'))
+    watcher.on('change', file => global.setTimeout(() => instrument(d, file, 'watch'), 25))
   }
 }
 
