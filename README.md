@@ -1,6 +1,6 @@
 # doctest-ts: doctests for TypeScript
 
-Say you have a file src/main.ts with a function like hasFoo:
+Say you have a file src/hasFoo.ts with a function like hasFoo:
 
 ```typescript
 function hasFoo(s: string): boolean {
@@ -26,8 +26,8 @@ function hasFoo(s: string): boolean {
 }
 ```
 
-Since the function is not exported we can only test this by either editing  or copying the entire file and gluing on tests at the end.
-This is what this library does.
+Since the function is not exported we can only test this by either editing or copying the entire file and gluing on tests at the end.
+This library goes for the second approach: making a copy of the file with the translated tests at the end. Run it like so:
 
 ```sh
 $ doctest-ts src/hasFoo.ts
