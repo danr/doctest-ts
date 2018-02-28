@@ -197,7 +197,7 @@ function Doctests(d: ShowScript, buffer: string): string[] {
 
 function main() {
   const opts = minimist(process.argv.slice(2), {boolean: ['tape', 'ava', 'watch']})
-  const d = showScriptInstances[opts.tape == true ? 'tape' : 'ava']
+  const d = showScriptInstances[opts.ava == true ? 'ava' : 'tape']
   const files = opts._
   if (files.length == 0) {
     console.error(
@@ -223,4 +223,8 @@ function main() {
 }
 
 // if we are checking the doctests of this very file we don't need to run main
-~process.argv[1].indexOf('doctest') || main()
+if (~process.argv[1].indexOf('.doctest.')) {
+  console.debug(`Not running main since argv[1] contains '.doctest.':`, process.argv)
+} else {
+  main()
+}
