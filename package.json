@@ -8,7 +8,7 @@
     "doctest-ts": "dist/src/main.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod 755 dist/src/main.js",
     "test": "ts-node src/main.ts --tape src/*ts test/*ts && ts-node node_modules/.bin/tape test/*.ts src/*doctest*.ts | tap-diff",
     "doctest:watch": "ts-node src/main.ts --tape --watch {src,test}/*.ts | while read file; do echo tape $file; ts-node $file | tap-diff; done",
     "prettier": "rm -v -f {src,test}/*doctest.ts && prettier --list-different --write src/*ts* test/*ts*"
