@@ -81,12 +81,10 @@ All of 6 tests passed!
 
 There are four different outputs available:
 
-```
 * tape
 * AVA
 * jest
 * mocha (using chai)
-```
 
 Pull requests for other test runners are welcome.
 
