@@ -79,7 +79,16 @@ passed: 6  failed: 0  of 6 tests  (171ms)
 All of 6 tests passed!
 ```
 
-The default is to use tape output but it can also create ava output. Pull requests for other test runners are welcome.
+There are four different outputs available:
+
+```
+* tape
+* AVA
+* jest
+* mocha (using chai)
+```
+
+Pull requests for other test runners are welcome.
 
 ## Watching file changes
 

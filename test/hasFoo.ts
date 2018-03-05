@@ -9,6 +9,5 @@
 
 */
 function hasFoo(s: string): boolean {
-  return null != s.match(/foo/)
+  return null != s.match(/foo/i)
 }
-

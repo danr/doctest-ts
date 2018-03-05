@@ -1,10 +1,10 @@
-import * as main from '../src/main'
+import * as internal from '../src/internal'
 import * as test from 'tape'
 
 test('tests', t => {
   t.plan(1)
   t.deepEqual(
-    main.extractScripts(`*
+    internal.extractScripts(`*
 
   foo // => 1
 
@@ -16,7 +16,7 @@ test('tests', t => {
 test('tests', t => {
   t.plan(1)
   t.deepEqual(
-    main.extractScripts(`*
+    internal.extractScripts(`*
 
     a
     b // => 1 + 2 + 3
@@ -39,7 +39,7 @@ const c = (comment: string, context: string | null) => ({comment, context})
 
 test('modules and namespace', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** m */
     namespace m {}
 
@@ -51,7 +51,7 @@ test('modules and namespace', t => {
 
 test('const', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** u */
     const u = 1
   `)
@@ -60,7 +60,7 @@ test('const', t => {
 
 test('const object', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** k */
     const k = {
       /** a */
@@ -74,7 +74,7 @@ test('const object', t => {
 
 test('object deconstruction', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** hello */
     const {u, v} = {u: 1, v: 2}
   `)
@@ -83,7 +83,7 @@ test('object deconstruction', t => {
 
 test('function', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** v */
     function v(s: string): number {
       return s.length + 1
@@ -94,7 +94,7 @@ test('function', t => {
 
 test('class', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** C */
     class C<A> {
       /** constructor */
@@ -111,7 +111,7 @@ test('class', t => {
 
 test('interface', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** I */
     interface I<A> {
       /** i */
@@ -125,7 +125,7 @@ test('interface', t => {
 
 test('type', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     /** T */
     type T = number
   `)
@@ -134,7 +134,7 @@ test('type', t => {
 
 test('anywhere', t => {
   t.plan(1)
-  const cs = main.Comments(`
+  const cs = internal.Comments(`
     const $ = () => {
       /** test1 */
       const w = 1
