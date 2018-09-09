@@ -85,6 +85,8 @@ const doctest_rhs = (s: string) => s.match(/^\s*\/\/[ \t]*=>([^\n]*)/m)
 
   extractScript('s') // => [{tag: 'Statement', stmt: 's;'}]
 
+  extractScript('foo(\'"bar\'') // => [{tag: 'Statement', stmt: 'foo("\\"bar");'}]
+
   extractScript('e // => 1') // => [{tag: '==', lhs: 'e', rhs: '1'}]
 
   extractScript('s; e // => 1') // => [{tag: 'Statement', stmt: 's;'}, {tag: '==', lhs: 'e', rhs: '1'}]
@@ -161,15 +163,14 @@ const mochaOrJest = (deepEqual: string): typeof tapeOrAVA => (script, c) => {
       if (s.tag == 'Statement') {
         return s.stmt
       } else {
-        return `__expect(${s.lhs}).${deepEqual}(${s.rhs})`
+        return `it('${s.lhs.replace(/'/g, "\\'")}', () => __expect(${s.lhs}).${deepEqual}(${s.rhs}))`
       }
     })
     .map(x => '\n        ' + x)
     .join('')
 
   return `
-    describe(${showContext(c)}, () => {
-      it(${showContext(c)}, () => {${body}})
+    describe(${showContext(c)}, () => {${body}
     })
   `
 }
