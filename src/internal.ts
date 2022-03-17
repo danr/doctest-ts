@@ -1,4 +1,5 @@
 import * as ts from 'typescript'
+import {SyntaxKind} from 'typescript'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -30,7 +31,6 @@ export interface Comment {
 
 export function Comments(s: string): Comment[] {
   const out: Comment[] = []
-  function add_comment(c: string, context: string | null) {}
 
   function traverse(node: ts.Node) {
     const jsdocs = (node as any).jsDoc || []
@@ -50,8 +50,22 @@ export function Comments(s: string): Comment[] {
         }
       }
       jsdocs.forEach((doc: ts.JSDoc) => {
-        out.push({comment: doc.comment || '', context})
+        out.push({comment: doc.comment || '', context});
+        
+        // A part of the comment might be in the tags; we simply add those too and figure out later if they contain doctests
+        const tags = doc.tags;
+        if(tags !== undefined){
+          tags.forEach(tag => {
+            out.push({comment: tag.comment || '', context});
+          });
+        }
+          
+            
+        /*(doc.tags || []).forEach(tag => {
+          console.log(tag)
+        })*/
       })
+      
     }
     ts.forEachChild(node, traverse)
   }
@@ -110,11 +124,18 @@ export function extractScript(s: string): Script {
   })
 }
 
-export function extractScripts(docstring: string): Script[] {
-  const out = [] as Script[]
+export function extractScripts(docstring: string): {script: Script, name?: string}[] {
+  const out = [] as {script: Script, name?: string}[]
   docstring.split(/\n\n+/m).forEach(s => {
     if (is_doctest(s)) {
-      out.push(extractScript(s))
+      const script = extractScript(s)
+      let name = undefined
+      const match  = s.match(/^[ \t]*\/\/([^\n]*)/)
+      if(match !== null)
+      {
+        name = match[1].trim()
+      }
+      out.push({script, name})
     }
   })
   return out
@@ -124,7 +145,7 @@ export function extractScripts(docstring: string): Script[] {
 // Showing test scripts
 export interface ShowScript {
   showImports: string
-  showScript(script: Script, c: Context): string
+  showScript(script: Script, c: Context, name?: string): string
 }
 
 /** show("hello") // => '"hello"' */
@@ -136,7 +157,7 @@ export function showContext(c: Context) {
   return show(c || 'doctest')
 }
 
-function tapeOrAVA(script: Script, c: Context, before_end = (t: string) => '') {
+function tapeOrAVA(script: Script, c: Context, name: string | undefined, before_end = (t: string) => '') {
   const t = `t`
   const body = script
     .map(s => {
@@ -155,7 +176,7 @@ function tapeOrAVA(script: Script, c: Context, before_end = (t: string) => '') {
     })`
 }
 
-const mochaOrJest = (deepEqual: string): typeof tapeOrAVA => (script, c) => {
+const mochaOrJest = (deepEqual: string): typeof tapeOrAVA => (script, c, name) => {
   const body = script
     .map(s => {
       if (s.tag == 'Statement') {
@@ -169,7 +190,7 @@ const mochaOrJest = (deepEqual: string): typeof tapeOrAVA => (script, c) => {
 
   return `
     describe(${showContext(c)}, () => {
-      it(${showContext(c)}, () => {${body}})
+      it(${show(name) || showContext(c)}, () => {${body}})
     })
   `
 }
@@ -182,7 +203,7 @@ export const showScriptInstances: Record<string, ShowScript> = {
 
   tape: {
     showImports: 'import * as __test from "tape"',
-    showScript: (s, c) => tapeOrAVA(s, c, t => `\n;${t}.end()`),
+    showScript: (s, c, name) => tapeOrAVA(s, c, name, t => `\n;${t}.end()`),
   },
 
   mocha: {
@@ -196,12 +217,34 @@ export const showScriptInstances: Record<string, ShowScript> = {
   },
 }
 
+function exposePrivates(s: string): string {
+  const ast = ts.createSourceFile('_.ts', s, ts.ScriptTarget.Latest) as ts.SourceFile
+
+  const transformer = <T extends ts.Node>(context: ts.TransformationContext) =>
+      (rootNode: T) => {
+        function visit(node: ts.Node): ts.Node {
+          if (node.kind === ts.SyntaxKind.PrivateKeyword) {
+            return ts.createModifier(ts.SyntaxKind.PublicKeyword)
+          }
+          return ts.visitEachChild(node, visit, context);
+        }
+        return ts.visitNode(rootNode, visit);
+      };
+
+ const transformed = ts.transform(ast, [transformer]).transformed[0]
+  
+  const pwoc = ts.createPrinter({removeComments: true})
+  return  pwoc.printNode(ts.EmitHint.Unspecified, transformed, ast)
+}
+
+
 export function instrument(d: ShowScript, file: string, mode?: 'watch'): void {
   const {base, ext, ...u} = path.parse(file)
   if (base.includes('doctest')) {
     return
   }
   const buffer = fs.readFileSync(file, {encoding: 'utf8'})
+  const withoutPrivates = exposePrivates(buffer)
   const tests = Doctests(d, buffer)
   const outfile = path.format({...u, ext: '.doctest' + ext})
   if (tests.length == 0) {
@@ -211,7 +254,7 @@ export function instrument(d: ShowScript, file: string, mode?: 'watch'): void {
     if (mode == 'watch') {
       console.log(outfile)
     }
-    fs.writeFileSync(outfile, buffer + '\n' + d.showImports + '\n' + tests.join('\n'))
+    fs.writeFileSync(outfile, withoutPrivates + '\n' + d.showImports + '\n' + tests.join('\n'))
   }
 }
 
@@ -219,7 +262,7 @@ function Doctests(d: ShowScript, buffer: string): string[] {
   const out: string[] = []
   for (const c of Comments(buffer)) {
     for (const script of extractScripts(c.comment)) {
-      out.push(d.showScript(script, c.context))
+      out.push(d.showScript(script.script,  c.context, script.name))
     }
   }
   return out

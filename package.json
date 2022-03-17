@@ -1,7 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/package",
   "name": "doctest-ts",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "doctest support for typescript",
   "main": "src/main.ts",
   "bin": {
@@ -11,6 +11,7 @@
     "build": "tsc && chmod 755 dist/src/main.js",
     "test": "ts-node src/main.ts --tape src/*ts test/*ts && ts-node node_modules/.bin/tape test/*.ts src/*doctest*.ts | tap-diff",
     "doctest:watch": "ts-node src/main.ts --tape --watch {src,test}/*.ts | while read file; do echo tape $file; ts-node $file | tap-diff; done",
+    "debug": "ts-node src/main.ts --mocha examples/example0.ts",
     "prettier": "rm -v -f {src,test}/*doctest.ts && prettier --list-different --write src/*ts* test/*ts*"
   },
   "repository": {
