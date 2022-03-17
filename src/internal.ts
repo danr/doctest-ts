@@ -59,11 +59,6 @@ export function Comments(s: string): Comment[] {
             out.push({comment: tag.comment || '', context});
           });
         }
-          
-            
-        /*(doc.tags || []).forEach(tag => {
-          console.log(tag)
-        })*/
       })
       
     }
