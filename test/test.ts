@@ -9,7 +9,7 @@ test('tests', t => {
   foo // => 1
 
   `),
-    [[{tag: '==', lhs: `foo`, rhs: `1`}]]
+    [{ script: [{tag: '==', lhs: `foo`, rhs: `1`}], name: undefined }]
   )
 })
 
@@ -23,7 +23,7 @@ test('tests', t => {
     c // => 1
     d
 
-    */`),
+    */`).map(s => s.script),
     [
       [
         {tag: 'Statement', stmt: 'a;'},
