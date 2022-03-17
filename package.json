@@ -33,7 +33,7 @@
     "chokidar": "^2.0.1",
     "global": "^4.3.2",
     "minimist": "^1.2.0",
-    "typescript": "^2.7.1"
+    "typescript": "^4.6.2"
   },
   "devDependencies": {
     "@types/chokidar": "^1.7.5",
