@@ -12,7 +12,13 @@ export default class Example0 {
      * Example0.get() + 1 // => 43
      */
     private static get(){
+        // a comment
+        // @ts-ignore
         return 42
+    }
+    
+    public testMore(){
+        return ({} as any) ?.xyz?.abc ?? 0
     }
     
 }

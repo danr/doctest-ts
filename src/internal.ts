@@ -1,5 +1,5 @@
 import * as ts from 'typescript'
-import {SyntaxKind} from 'typescript'
+import {JSDocComment} from 'typescript'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -31,7 +31,20 @@ export interface Comment {
 
 export function Comments(s: string): Comment[] {
   const out: Comment[] = []
-
+  function registerComment(context: string | null,comment: string | ts.NodeArray<JSDocComment> | undefined){
+      if(comment === undefined){
+        return
+      }
+      if(typeof comment === "string"){  
+        out.push({comment: comment || '', context});
+      }else{
+        comment.forEach(jsDocComment => {
+          out.push({comment: jsDocComment.text || '', context});
+        })
+      }
+  }
+  
+  
   function traverse(node: ts.Node) {
     const jsdocs = (node as any).jsDoc || []
     if (jsdocs.length > 0) {
@@ -45,18 +58,17 @@ export function Comments(s: string): Comment[] {
             context = decls[0].name.escapedText || null
           }
         } catch (e) {
-          // console.dir(node)
           context = ts.isConstructorDeclaration(node) ? 'constructor' : null
         }
       }
       jsdocs.forEach((doc: ts.JSDoc) => {
-        out.push({comment: doc.comment || '', context});
+       registerComment(context, doc.comment)
         
         // A part of the comment might be in the tags; we simply add those too and figure out later if they contain doctests
         const tags = doc.tags;
         if(tags !== undefined){
           tags.forEach(tag => {
-            out.push({comment: tag.comment || '', context});
+            registerComment(context, tag.comment)
           });
         }
       })
@@ -64,7 +76,7 @@ export function Comments(s: string): Comment[] {
     }
     ts.forEachChild(node, traverse)
   }
-
+  
   const ast = ts.createSourceFile('_.ts', s, ts.ScriptTarget.Latest)
   traverse(ast)
 
@@ -228,7 +240,7 @@ function exposePrivates(s: string): string {
 
  const transformed = ts.transform(ast, [transformer]).transformed[0]
   
-  const pwoc = ts.createPrinter({removeComments: true})
+  const pwoc = ts.createPrinter({ removeComments: false})
   return  pwoc.printNode(ts.EmitHint.Unspecified, transformed, ast)
 }
 

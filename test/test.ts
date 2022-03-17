@@ -46,7 +46,7 @@ test('modules and namespace', t => {
     /** ns */
     namespace ns {}
   `)
-  t.deepEqual(cs, [c('m ', 'm'), c('ns ', 'ns')])
+  t.deepEqual(cs, [c('m', 'm'), c('ns', 'ns')])
 })
 
 test('const', t => {
@@ -55,7 +55,7 @@ test('const', t => {
     /** u */
     const u = 1
   `)
-  t.deepEqual(cs, [c('u ', 'u')])
+  t.deepEqual(cs, [c('u', 'u')])
 })
 
 test('const object', t => {
@@ -69,7 +69,7 @@ test('const object', t => {
       b(x: string) { return x+x }
     }
   `)
-  t.deepEqual(cs, [c('k ', 'k'), c('a ', 'a'), c('b ', 'b')])
+  t.deepEqual(cs, [c('k', 'k'), c('a', 'a'), c('b', 'b')])
 })
 
 test('object deconstruction', t => {
@@ -78,7 +78,7 @@ test('object deconstruction', t => {
     /** hello */
     const {u, v} = {u: 1, v: 2}
   `)
-  t.deepEqual(cs, [c('hello ', null)])
+  t.deepEqual(cs, [c('hello', null)])
 })
 
 test('function', t => {
@@ -89,7 +89,7 @@ test('function', t => {
       return s.length + 1
     }
   `)
-  t.deepEqual(cs, [c('v ', 'v')])
+  t.deepEqual(cs, [c('v', 'v')])
 })
 
 test('class', t => {
@@ -106,7 +106,7 @@ test('class', t => {
       p: Array<number>
     }
   `)
-  t.deepEqual(cs, [c('C ', 'C'), c('constructor ', 'constructor'), c('m ', 'm'), c('p ', 'p')])
+  t.deepEqual(cs, [c('C', 'C'), c('constructor', 'constructor'), c('m', 'm'), c('p', 'p')])
 })
 
 test('interface', t => {
@@ -120,7 +120,7 @@ test('interface', t => {
       j(a: A): string
     }
   `)
-  t.deepEqual(cs, [c('I ', 'I'), c('i ', 'i'), c('j ', 'j')])
+  t.deepEqual(cs, [c('I', 'I'), c('i', 'i'), c('j', 'j')])
 })
 
 test('type', t => {
@@ -129,7 +129,7 @@ test('type', t => {
     /** T */
     type T = number
   `)
-  t.deepEqual(cs, [c('T ', 'T')])
+  t.deepEqual(cs, [c('T', 'T')])
 })
 
 test('anywhere', t => {
@@ -148,5 +148,5 @@ test('anywhere', t => {
       return f(f(w))
     }
   `)
-  t.deepEqual(cs, [c('test1 ', 'w'), c('test2 ', 'f')])
+  t.deepEqual(cs, [c('test1', 'w'), c('test2', 'f'), c('test3',  null)])
 })
