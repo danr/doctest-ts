@@ -1,7 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/package",
   "name": "doctest-ts-improved",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "doctest support for typescript with Mocha",
   "main": "src/main.ts",
   "bin": {
