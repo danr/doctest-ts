@@ -1,21 +1,23 @@
 {
-    "compilerOptions": {
-        "outDir": "./dist",
-        "sourceMap": true,
-        "noImplicitAny": true,
-        "strict": true,
-        "target": "es6",
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "lib": ["es6"],
-        "noEmitOnError": true,
-        "allowUnreachableCode": true
-    },
-    "include": [
-        "src",
-        "test"
+  "compilerOptions": {
+    "outDir": "./dist",
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "strict": true,
+    "target": "es6",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": [
+      "es6"
     ],
-    "parcelTsPluginOptions": {
-        "transpileOnly": false
-    }
+    "noEmitOnError": true,
+    "allowUnreachableCode": true
+  },
+  "include": [
+    "src",
+    "test"
+  ],
+  "parcelTsPluginOptions": {
+    "transpileOnly": false
+  }
 }

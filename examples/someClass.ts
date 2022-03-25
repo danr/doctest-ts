@@ -1,9 +1,6 @@
-# doctest-ts-improved: doctests for TypeScript
 
-Easy doctests for typescript modules, including private methods and extra imports:
-
-```
 export default class SomeClass {
+
     /**
      * Gets the field doubled
      * @example xyz
@@ -22,9 +19,9 @@ export default class SomeClass {
         // @ts-ignore
         return 42
     }
+    
+    public xyz(){
+        return 5
+    }
+
 }
-```
-
-# License
-
-MIT

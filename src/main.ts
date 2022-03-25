@@ -1,49 +1,52 @@
 #!/usr/bin/env node
-import * as chokidar from 'chokidar'
-import * as minimist from 'minimist'
-import {instrument, showScriptInstances} from './internal'
-function main() {
-  const outputs = Object.keys(showScriptInstances)
-  const flags = outputs.map(f => '--' + f)
-  const boolean = ['watch'].concat(outputs)
-  const opts = minimist(process.argv.slice(2), {boolean})
-  let output: string | null = null
-  let error: string | null = null
-  outputs.forEach(k => {
-    if (opts[k]) {
-      if (output != null) {
-        error = `Cannot output both ${output} and ${k}`
-      }
-      output = k
+import {lstatSync, readdirSync} from "fs";
+import TestCreator from "./TestCreator";
+
+
+function readDirRecSync(path: string, maxDepth = 999): string[] {
+    const result = []
+    if (maxDepth <= 0) {
+        return []
     }
-  })
-  if (output == null) {
-    error = `Choose an output from ${flags.join(' ')}`
-  }
-  const files = opts._
-  if (files.length == 0 || output == null) {
-    console.error(
-      `
-      Error: ${error || `No files specified!`}
-
-      Usage:
-
-        ${flags.join('|')} [-w|--watch] files globs...
-
-    Your options were:`,
-      opts,
-      `
-    From:`,
-      process.argv
-    )
-    return
-  }
-  const d = showScriptInstances[output]
-  files.forEach(file => instrument(d, file))
-  if (opts.w == true || opts.watch == true) {
-    const watcher = chokidar.watch(files, {ignored: '*.doctest.*'})
-    watcher.on('change', file => global.setTimeout(() => instrument(d, file, 'watch'), 25))
-  }
+    for (const entry of readdirSync(path)) {
+        const fullEntry = path + "/" + entry
+        const stats = lstatSync(fullEntry)
+        if (stats.isDirectory()) {
+            // Subdirectory
+            // @ts-ignore
+            result.push(...ScriptUtils.readDirRecSync(fullEntry, maxDepth - 1))
+        } else {
+            result.push(fullEntry)
+        }
+    }
+    return result;
 }
 
+function main(){
+    
+const args = process.argv
+console.log(args.join(","))
+const directory = args[2].replace(/\/$/, "")
+if(directory === "--require"){
+    console.error("Probably running the testsuite, detects '--require' as second argument. Quitting now")
+    return;
+}
+if(directory === undefined){
+    console.log("Usage: doctest-ts-improved <directory under test>. This will automatically scan recursively for '.ts'-files, excluding 'node_modules' '*.doctest.ts'-files")
+}
+
+const files = readDirRecSync(directory).filter(p => !p.startsWith("./node_modules") && !p.endsWith(".doctest.ts"))
+const noTests : string[] = []
+for (const file of files) {
+    const generated = new TestCreator(file).createTest()
+    if(generated === 0){
+        noTests.push(file)
+    }else{
+        console.log("Generated tests for "+file+" ("+generated+" tests found)")
+    }
+}
+if(noTests.length > 0){
+    console.log("No tests found in: "+noTests.join(", "))
+}
+}
 main()
