@@ -5,10 +5,10 @@
   "description": "doctest support for typescript with Mocha",
   "main": "src/main.ts",
   "bin": {
-    "doctest-ts-improved": "dist/src/main.js"
+    "doctest-ts-improved": "dist/main.js"
   },
   "scripts": {
-    "build": "tsc && chmod 755 dist/src/main.js",
+    "build": "tsc && chmod 755 dist/main.js",
     "doctest:watch": "ts-node src/main.ts --tape --watch {src,test}/*.ts | while read file; do echo tape $file; ts-node $file | tap-diff; done",
     "test": "ts-node src/main.ts examples/ && ts-node src/main.ts src/ && mocha --require ts-node/register examples/*.ts src/*.ts",
     "prettier": "rm -v -f {src,test}/*doctest.ts && prettier --list-different --write src/*ts* test/*ts*"
