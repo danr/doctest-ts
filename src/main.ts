@@ -50,7 +50,7 @@ function main() {
         }
     }
     if (noTests.length > 0) {
-        console.log("No tests found in: " + noTests.join(", "))
+        console.log(`No tests found in ${noTests.length} files: ${noTests.join(", ")}`)
     }
 }
 
