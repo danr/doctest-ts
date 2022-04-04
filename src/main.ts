@@ -50,7 +50,9 @@ function main() {
         }
     }
     if (noTests.length > 0) {
-        console.log(`No tests found in ${noTests.length} files: ${noTests.join(", ")}`)
+        const i = Math.round(Math.random() * noTests.length)
+        const randomFile = noTests[i]
+        console.log(`No tests found in ${noTests.length} files. Why not add a test to ${randomFile}?`)
     }
 }
 

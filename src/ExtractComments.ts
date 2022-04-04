@@ -25,6 +25,9 @@ export default class ExtractComments {
         this.traverse(ast, {filepath: filepath})
     }
 
+    /**
+     * Gets the actual comments
+     */
     public getComments(): { comment: string, context: Context }[] {
         return this.results
     }
