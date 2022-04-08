@@ -61,24 +61,24 @@ A.x() // => 21 * 2`
             expect(scripts.length).eq(3)
             const [doctest0, doctest1, doctest2shouldEqual] = scripts;
             expect(doctest0).to.deep.eq({
-                script: [{tag: '==', lhs: 'A.x()', rhs: "42", line: 2}],
+                script: [{tag: '==', lhs: 'A.x()', rhs: "42", line: 0}],
                 name: undefined,
                 line: 2
             })
 
             expect(doctest1).to.deep.eq({
-                script: [{tag: '==', lhs: 'A.x() + 1', rhs: "43", line: 4}, {
+                script: [{tag: '==', lhs: 'A.x() + 1', rhs: "43", line: 0}, {
                     tag: '==',
                     lhs: 'A.x() - 1',
                     rhs: "41",
-                    line: 5
+                    line: 1
                 }],
                 name: undefined,
                 line: 4
             })
 
             expect(doctest2shouldEqual).to.deep.eq({
-                script: [{tag: '==', lhs: 'A.x()', rhs: "21 * 2", line: 7}],
+                script: [{tag: '==', lhs: 'A.x()', rhs: "21 * 2", line: 0}],
                 name: "should equal 2 * 21",
                 line: 7
             })

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/package",
   "name": "doctest-ts-improved",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "doctest support for typescript with Mocha",
   "main": "src/main.ts",
   "bin": {
@@ -9,9 +9,10 @@
   },
   "scripts": {
     "build": "tsc && chmod 755 dist/main.js",
+    "gen": "ts-node src/main.ts",
     "test": "ts-node src/main.ts examples/ && ts-node src/main.ts src/ && mocha --require ts-node/register examples/*.ts src/*.ts",
     "prettier": "rm -v -f {src,test}/*doctest.ts && prettier --list-different --write src/*ts* test/*ts*",
-    "publish": "npm run build && npm publish"
+    "publish": "npm run test && npm run build && npm publish"
   },
   "repository": {
     "type": "git",
@@ -33,6 +34,7 @@
     "chai": "^4.3.6",
     "global": "^4.3.2",
     "mocha": "^9.2.2",
+    "process-yargs-parser": "^2.1.0",
     "typescript": "^4.6.2"
   },
   "devDependencies": {

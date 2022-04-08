@@ -58,9 +58,22 @@ export class ScriptExtraction {
      * ScriptExtraction.extractScript('s; e // => 1', 0) // => [{tag: 'Statement', stmt: 's;'}, {tag: '==', lhs: 'e', rhs: '1', line: 1}]
      */
     private static extractScript(s: string, linestart: number): Script {
+        function getLineNumber(pos: number) {
+            let line = 0;
+            for (let i = 0; i < pos; i++) {
+                if (s === "\n") {
+                    line++
+                }
+            }
+            return line;
+        }
+        
         const pwoc = ts.createPrinter({removeComments: true})
         const ast = ts.createSourceFile('_.ts', s, ts.ScriptTarget.Latest)
         return ast.statements.map((stmt, i): Statement | Equality => {
+            
+            
+            
             if (ts.isExpressionStatement(stmt)) {
                 const next = ast.statements[i + 1] // zip with next
                 const [a, z] = next ? [next.pos, next.end] : [stmt.end, ast.end]
@@ -69,7 +82,9 @@ export class ScriptExtraction {
                 if (m && m[1]) {
                     const lhs = pwoc.printNode(ts.EmitHint.Expression, stmt.expression, ast)
                     const rhs = m[1].trim()
-                    return {tag: '==', lhs, rhs, line: linestart + i}
+
+                    
+                    return {tag: '==', lhs, rhs, line: linestart + getLineNumber(stmt.pos)}
                 }
             }
 

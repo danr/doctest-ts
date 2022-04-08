@@ -6,6 +6,7 @@ export interface Equality {
     tag: '=='
     lhs: string
     rhs: string,
+    // Line number in the single script
     line: number
 }
 
@@ -35,7 +36,7 @@ export default class UnitTest {
         return ScriptExtraction.extractScripts(comment).map(({script, line, name}, i) =>
             new UnitTest(script, {
                 ...context,
-                linenumber: (context.linenumber ?? 0) + line,
+                linenumber: (context.linenumber ?? 0) ,
                 testname: name ?? 'doctest ' + i
             },imports))
     }
@@ -62,7 +63,7 @@ export default class UnitTest {
                 if (s.tag == 'Statement') {
                     return s.stmt
                 } else {
-                    return `__expect(${s.lhs}, "failed at ${this.context.functionname} (${this.context.filepath}:${s.line}:1)").to.deep.equal(${s.rhs})`
+                    return `__expect(${s.lhs}, "failed at ${this.context.functionname} (${this.context.filepath}:${s.line + (this.context.linenumber ?? 0)}:1)").to.deep.equal(${s.rhs})`
                 }
             })
             .map(x => '\n        ' + x)
