@@ -33,7 +33,8 @@ export default class UnitTest {
 
     public static FromComment(comment: string, context: Context): UnitTest[] {
         const imports = ScriptExtraction.extractImports(comment)
-        return ScriptExtraction.extractScripts(comment).map(({script, line, name}, i) =>
+        return ScriptExtraction.extractScripts(comment).map(
+            ({script, name}, i) =>
             new UnitTest(script, {
                 ...context,
                 linenumber: (context.linenumber ?? 0) ,
@@ -63,7 +64,7 @@ export default class UnitTest {
                 if (s.tag == 'Statement') {
                     return s.stmt
                 } else {
-                    return `__expect(${s.lhs}, "failed at ${this.context.functionname} (${this.context.filepath}:${s.line + (this.context.linenumber ?? 0)}:1)").to.deep.equal(${s.rhs})`
+                    return `__expect(${s.lhs}, "failed at ${this.context.functionname} (${this.context.filepath}:${1 + s.line + (this.context.linenumber ?? 0)}:1)").to.deep.equal(${s.rhs})`
                 }
             })
             .map(x => '\n        ' + x)

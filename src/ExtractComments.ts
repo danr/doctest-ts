@@ -26,7 +26,7 @@ export default class ExtractComments {
     }
 
     /**
-     * Gets the actual comments
+     * Gets the actual comments and their context.
      */
     public getComments(): { comment: string, context: Context }[] {
         return this.results

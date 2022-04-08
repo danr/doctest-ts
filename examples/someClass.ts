@@ -13,6 +13,11 @@ export default class SomeClass {
      * SomeClass.get() + 1 // => 43
      * 
      * new OtherClass().doSomething(new SomeClass()) // => 5
+     *
+     * const abc = 42
+     * SomeClass.get() // => abc
+     * SomeClass.get() + 1 // => abc + 1
+     * 
      */
     private static get() : number{
         // a comment
