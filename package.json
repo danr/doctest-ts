@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danr/doctest-ts.git"
+    "url": "git+https://github.com/pietervdvn/doctest-ts.git"
   },
   "keywords": [
     "doctest",
@@ -26,9 +26,9 @@
   "author": "Dan Rosén",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/danr/doctest-ts/issues"
+    "url": "https://github.com/pietervdvn/doctest-ts/issues"
   },
-  "homepage": "https://github.com/danr/doctest-ts#readme",
+  "homepage": "https://github.com/pietervdvn/doctest-ts#readme",
   "dependencies": {
     "@types/chai": "^4.3.0",
     "chai": "^4.3.6",
