@@ -1,1 +1,3 @@
 *doctest*
+node_modules/
+dist/
